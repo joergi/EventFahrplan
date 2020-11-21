@@ -44,8 +44,8 @@ class SessionUrlComposer @JvmOverloads constructor(
     private fun getComposedSessionUrl(sessionIdentifier: String) =
             String.format(sessionUrlTemplate, sessionIdentifier)
 
-    companion object {
-        private const val NO_URL = ""
+    private companion object {
+        const val NO_URL = ""
     }
 
 }
