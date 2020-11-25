@@ -91,6 +91,7 @@ public class FahrplanFragment extends Fragment implements SessionViewEventsHandl
     private static final int CONTEXT_MENU_ITEM_ID_SHARE_JSON = 6;
 
     private static final int ONE_DAY = (int) Duration.ofDays(1).toMinutes();
+    private static final int FIVE_MINUTES = 5;
     private static final int FIFTEEN_MINUTES = 15;
 
     private float scale;
@@ -452,7 +453,7 @@ public class FahrplanFragment extends Fragment implements SessionViewEventsHandl
                     if (session.startTime <= time && session.getEndsAtTime() > time) {
                         MyApp.LogDebug(LOG_TAG, session.title);
                         MyApp.LogDebug(LOG_TAG, time + " " + session.startTime + "/" + session.duration);
-                        scrollAmount -= ((time - session.startTime) / 5) * boxHeight;
+                        scrollAmount -= ((time - session.startTime) / FIVE_MINUTES) * boxHeight;
                         time = session.startTime;
                     }
                 }
@@ -493,7 +494,7 @@ public class FahrplanFragment extends Fragment implements SessionViewEventsHandl
     private void scrollTo(@NonNull Session session) {
         final ScrollView parent = requireViewByIdCompat(getView(), R.id.scrollView1);
         int height = getNormalizedBoxHeight(getResources(), scale, LOG_TAG);
-        final int pos = (session.relStartTime - conference.getFirstSessionStartsAt()) / 5 * height;
+        final int pos = (session.relStartTime - conference.getFirstSessionStartsAt()) / FIVE_MINUTES * height;
         MyApp.LogDebug(LOG_TAG, "position is " + pos);
         parent.post(() -> parent.scrollTo(0, pos));
         final HorizontalSnapScrollView horiz = getView().findViewById(R.id.horizScroller);
