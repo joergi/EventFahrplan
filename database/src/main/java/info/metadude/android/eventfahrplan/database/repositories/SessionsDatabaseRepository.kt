@@ -26,6 +26,7 @@ import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.Se
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.DAY
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.DESCR
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.DURATION
+import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.GUID
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.LANG
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.LINKS
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.REC_LICENSE
@@ -33,7 +34,6 @@ import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.Se
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.REL_START
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.ROOM
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.ROOM_IDX
-import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.SESSION_ID
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.SLUG
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.SPEAKERS
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.START
@@ -42,6 +42,7 @@ import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.Se
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.TRACK
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.TYPE
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns.URL
+import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Columns._ID
 import info.metadude.android.eventfahrplan.database.contract.FahrplanContract.SessionsTable.Values.REC_OPT_OUT_OFF
 import info.metadude.android.eventfahrplan.database.extensions.delete
 import info.metadude.android.eventfahrplan.database.extensions.getInt
@@ -85,29 +86,32 @@ class SessionsDatabaseRepository(
     }
 
     /**
-     * Updates or inserts sessions based on the given [contentValuesBySessionId].
+     * Updates or inserts sessions based on the given [contentValuesByGuid].
      */
-    fun upsertSessions(vararg contentValuesBySessionId: Pair</* sessionId */ String, ContentValues>) = with(sqLiteOpenHelper) {
+    fun upsertSessions(vararg contentValuesByGuid: Pair</* guid */ String, ContentValues>) = with(sqLiteOpenHelper) {
         writableDatabase.transaction {
-            contentValuesBySessionId.forEach { (sessionId, contentValues) ->
-                upsertSession(sessionId, contentValues)
+            contentValuesByGuid.forEach { (guid, contentValues) ->
+                upsertSession(guid, contentValues)
             }
         }
     }
 
     /**
-     * Updates a session with the given [contentValues]. A row is matched by its [sessionId].
+     * Updates a session with the given [contentValues]. A row is matched by its [guid].
      * If no row was affected by the update operation then an insert operation is performed
      * assuming that the session does not exist in the table.
      *
+     * The [guid] column is used for matching an existing row because this column holds unique values
+     * and to avoid an unneeded database SELECT just to retrieve the primary key of a row.
+     *
      * This function must be called in the context of a [transaction] block.
      */
-    private fun SQLiteDatabase.upsertSession(sessionId: String, contentValues: ContentValues) {
+    private fun SQLiteDatabase.upsertSession(guid: String, contentValues: ContentValues) {
         val affectedRowsCount = updateRow(
                 tableName = SessionsTable.NAME,
                 contentValues = contentValues,
-                columnName = SESSION_ID,
-                columnValue = sessionId
+                columnName = GUID,
+                columnValue = guid
         )
         if (affectedRowsCount == 0) {
             insert(
@@ -121,7 +125,9 @@ class SessionsDatabaseRepository(
         return try {
             query {
                 read(SessionsTable.NAME,
-                        selection = "$SESSION_ID=?",
+                        // The value of "sessionId" is replaced with the value of the "_id"
+                        // column when the session is queried initially to guarantee a unique value.
+                        selection = "$_ID=?",
                         selectionArgs = arrayOf(sessionId))
             }.first()
         } catch (e: NoSuchElementException) {
@@ -173,7 +179,11 @@ class SessionsDatabaseRepository(
                         Session.RECORDING_OPT_OUT_ON
 
             Session(
-                    sessionId = cursor.getString(SESSION_ID),
+                    // The value of the auto-incrementing primary key "_id" column is written as
+                    // the value of the "sessionId" field as the first step to rely on the "guid"
+                    // column. It has a unique value which is not guaranteed by "sessionId".
+                    sessionId = "${cursor.getLong(_ID)}",
+                    guid = cursor.getString(GUID),
                     abstractt = cursor.getString(ABSTRACT),
                     date = cursor.getString(DATE),
                     dateUTC = cursor.getLong(DATE_UTC),
